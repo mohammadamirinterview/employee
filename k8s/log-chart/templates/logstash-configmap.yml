@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: logstash-config
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+data:
+  logstash.conf: |
+    input {
+      beats {
+        port => 5044
+        ssl => false
+      }
+    }
+
+    filter {
+      grok {
+        match => { "message" => "%{TIMESTAMP_ISO8601:timestamp}] %{LOGLEVEL:loglevel}\|%{GREEDYDATA:module}\|%{GREEDYDATA:content}" }
+      }
+      date {
+        locale => "en"
+        match => [ "timestamp", "YYYY-MM-dd HH:mm:ss"]
+        target => "@timestamp"
+        timezone => "UTC"
+      }
+    }
+
+    output {
+      elasticsearch {
+        hosts => "elasticsearch-ingest:9200"
+        manage_template => false
+        index => "%{[@metadata][beat]}-%{[@metadata][version]}-%{+YYYY.MM.dd}"
+      }
+    }

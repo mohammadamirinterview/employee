@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus-deployment
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-server
+  template:
+    metadata:
+      labels:
+        app: prometheus-server
+    spec:
+      serviceAccountName: monitoring
+      containers:
+        - image: jimmidyson/configmap-reload:{{ .Values.prometheus.configreload.image.tag | default "latest" }}
+          imagePullPolicy: IfNotPresent
+          name: prometheus-server-configmap-reload
+          args:
+            - --volume-dir=/etc/prometheus
+            - --volume-dir=/etc/prometheus-rules
+            - --webhook-url=http://localhost:9090/-/reload
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus
+            - name: rules-volume
+              mountPath: /etc/prometheus-rules
+
+          resources:
+            {{- toYaml .Values.configreload_resources | nindent 12 }}
+
+        - image: prom/prometheus:{{ .Values.prometheus.image.tag | default "latest" }}
+          imagePullPolicy: IfNotPresent
+          name: prometheus
+          args:
+            - "--config.file=/etc/prometheus/prometheus.yml"
+            - "--storage.tsdb.path=/prometheus/"
+            - "--web.enable-lifecycle"
+            - "--storage.tsdb.no-lockfile"
+            - "--storage.tsdb.retention.time=90d"
+          ports:
+            - name: prometheus
+              containerPort: 9090
+
+          volumeMounts:
+            - name: prometheus-config-volume
+              mountPath: /etc/prometheus/
+            - name: prometheus-storage-volume
+              mountPath: /prometheus
+            - name: rules-volume
+              mountPath: /etc/prometheus-rules
+
+          resources:
+            {{- toYaml .Values.prometheus_resources | nindent 12 }}
+
+      initContainers:
+        - image: busybox:latest
+          imagePullPolicy: IfNotPresent
+          name: init-chown-data
+          command:
+            - chown
+            - -R
+            - nobody:nobody
+            - /prometheus
+          volumeMounts:
+            - name: prometheus-storage-volume
+              mountPath: /prometheus
+
+          resources:
+            {{- toYaml .Values.prometheus_init_resources | nindent 12 }}
+
+      volumes:
+        - name: prometheus-config-volume
+          configMap:
+            defaultMode: 420
+            name: prometheus-server-conf
+        - name: prometheus-storage-volume
+          persistentVolumeClaim:
+            claimName: prometheus-claim
+        - name: rules-volume
+          configMap:
+            name: prometheus-rules
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  name: prometheus-service
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+  labels:
+    name: prometheus
+spec:
+  selector:
+    app: prometheus-server
+  ports:
+    - name: prometheus
+      port: 80 
+      targetPort: prometheus

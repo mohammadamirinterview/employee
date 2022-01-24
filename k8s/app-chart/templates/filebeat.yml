@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: filebeat
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: filebeat
+spec:
+  selector:
+    matchLabels:
+      app: filebeat
+  template:
+    metadata:
+      labels:
+        app: filebeat
+    spec:
+      serviceAccountName: filebeat
+      terminationGracePeriodSeconds: 30
+      hostNetwork: true
+      containers:
+        - name: filebeat
+          image: docker.elastic.co/beats/filebeat:6.8.2
+          args: [
+            "-c", "/etc/filebeat.yml",
+            "-e",
+          ]
+          env:
+          - name: LOGSTASH_HOST
+            value: "logstash"
+          - name: BEATS_PORT
+            value: "5044"
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+          securityContext:
+            runAsUser: 0
+
+          resources:
+            {{- toYaml .Values.filebeat_resources | nindent 12 }}
+
+          volumeMounts:
+          - name: config
+            mountPath: /etc/filebeat.yml
+            readOnly: true
+            subPath: filebeat.yml
+          - name: logs
+            mountPath: /app/logs
+            readOnly: true
+
+      volumes:
+      - name: config
+        configMap:
+          defaultMode: 0640
+          name: filebeat-config
+      - name: logs
+        persistentVolumeClaim:
+          claimName: django-logs-pvc
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0

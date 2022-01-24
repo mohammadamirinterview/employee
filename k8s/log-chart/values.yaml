@@ -1,0 +1,68 @@
+# NameSpace
+namespace: ""
+
+# Elasticsearch Data
+elastic_data_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Elasticsearch Ingest
+elastic_ingest_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Elasticsearch Master
+elastic_master_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Elasticsearch Init Containers
+elastic_init_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Elasticsearch Exporter
+elastic_exporter_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Logstash
+logstash_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Kibana
+kibana_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+service:
+  nodeport: ""

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: elasticsearch-exporter
+  name: elasticsearch-exporter
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: elasticsearch-exporter
+  template:
+    metadata:
+      labels:
+        app: elasticsearch-exporter
+    spec:
+      containers:
+        - name: elasticsearch-exporter
+          image: justwatch/elasticsearch_exporter:1.1.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - "elasticsearch_exporter"
+            - "--es.uri=http://elasticsearch-ingest:9200"
+            - "--es.all"
+            - "--es.cluster_settings"
+            - "--es.indices"
+            - "--es.shards"
+          resources:
+            {{- toYaml .Values.elastic_exporter_resources | nindent 12 }}
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch-exporter
+  labels:
+    app: elasticsearch-exporter
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  selector:
+    app: elasticsearch-exporter
+  type: ClusterIP
+  ports:
+  - name: exporter
+    port: 9114
+    targetPort: 9114
+    protocol: TCP

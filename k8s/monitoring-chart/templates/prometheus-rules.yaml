@@ -1,0 +1,601 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-rules
+  labels:
+    name: prometheus-rules
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+data:
+  alert.rules: |-
+    groups:
+      - name: devops
+        rules:
+        - alert: PrometheusJobMissing
+          expr: absent(up{job="mariadb_exporter"})
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Prometheus job missing (instance {{ "{{" }} $labels.instance }})"
+            description: "A Prometheus job has disappeared\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusTargetMissing
+          expr: up == 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Prometheus target missing (instance {{ "{{" }} $labels.instance }})"
+            description: "A Prometheus target has disappeared. An exporter might be crashed.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusConfigurationReloadFailure
+          expr: prometheus_config_last_reload_successful != 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Prometheus configuration reload failure (instance {{ "{{" }} $labels.instance }})"
+            description: "Prometheus configuration reload error\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusAlertmanagerConfigurationReloadFailure
+          expr: alertmanager_config_last_reload_successful != 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Prometheus AlertManager configuration reload failure (instance {{ "{{" }} $labels.instance }})"
+            description: "AlertManager configuration reload error\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusAlertmanagerConfigNotSynced
+          expr: count(count_values("config_hash", alertmanager_config_hash)) > 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Prometheus AlertManager config not synced (instance {{ "{{" }} $labels.instance }})"
+            description: "Configurations of AlertManager cluster instances are out of sync\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusNotConnectedToAlertmanager
+          expr: prometheus_notifications_alertmanagers_discovered < 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Prometheus not connected to alertmanager (instance {{ "{{" }} $labels.instance }})"
+            description: "Prometheus cannot connect the alertmanager\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusRuleEvaluationFailures
+          expr: increase(prometheus_rule_evaluation_failures_total[3m]) > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Prometheus rule evaluation failures (instance {{ "{{" }} $labels.instance }})"
+            description: "Prometheus encountered {{ "{{" }} $value }} rule evaluation failures, leading to potentially ignored alerts.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: PrometheusTargetScrapingSlow
+          expr: prometheus_target_interval_length_seconds{quantile="0.9"} > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Prometheus target scraping slow (instance {{ "{{" }} $labels.instance }})"
+            description: "Prometheus is scraping exporters slowly\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostOutOfMemory
+          expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host out of memory (instance {{ "{{" }} $labels.instance }})"
+            description: "Node memory is filling up (< 10% left)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostUnusualNetworkThroughputOut
+          expr: sum by (instance) (irate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 100
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host unusual network throughput out (instance {{ "{{" }} $labels.instance }})"
+            description: "Host network interfaces are probably sending too much data (> 100 MB/s)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostUnusualDiskReadRate
+          expr: sum by (instance) (irate(node_disk_read_bytes_total[2m])) / 1024 / 1024 > 50
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host unusual disk read rate (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk is probably reading too much data (> 50 MB/s)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostUnusualDiskWriteRate
+          expr: sum by (instance) (irate(node_disk_written_bytes_total[2m])) / 1024 / 1024 > 100
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host unusual disk write rate (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk is probably writing too much data (> 100 MB/s)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostOutOfDiskSpace
+          expr: (node_filesystem_avail_bytes{mountpoint="/rootfs"}  * 100) / node_filesystem_size_bytes{mountpoint="/rootfs"} < 10
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host out of disk space (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk is almost full (< 10% left)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostDiskWillFillIn4Hours
+          expr: predict_linear(node_filesystem_free_bytes{fstype!~"tmpfs"}[1h], 4 * 3600) < 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host disk will fill in 4 hours (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk will fill in 4 hours at current write rate\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostOutOfInodes
+          expr: node_filesystem_files_free{mountpoint ="/rootfs"} / node_filesystem_files{mountpoint ="/rootfs"} * 100 < 10
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host out of inodes (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk is almost running out of available inodes (< 10% left)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostUnusualDiskReadLatency
+          expr: rate(node_disk_read_time_seconds_total[1m]) / rate(node_disk_reads_completed_total[1m]) > 100
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host unusual disk read latency (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk latency is growing (read operations > 100ms)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostUnusualDiskWriteLatency
+          expr: rate(node_disk_write_time_seconds_total[1m]) / rate(node_disk_writes_completed_total[1m]) > 100
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host unusual disk write latency (instance {{ "{{" }} $labels.instance }})"
+            description: "Disk latency is growing (write operations > 100ms)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostHighCpuLoad
+          expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host high CPU load (instance {{ "{{" }} $labels.instance }})"
+            description: "CPU load is > 80%\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostContextSwitching
+          expr: (rate(node_context_switches_total[5m])) / (count without(cpu, mode) (node_cpu_seconds_total{mode="idle"})) > 12000
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host context switching (instance {{ "{{" }} $labels.instance }})"
+            description: "Context switching is growing on node (> 1200 / s)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostSwapIsFillingUp
+          expr: (1 - (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)) * 100 > 90
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host swap is filling up (instance {{ "{{" }} $labels.instance }})"
+            description: "Swap is filling up (>90%)\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostKernelVersionDeviations
+          expr: count(sum(label_replace(node_uname_info, "kernel", "$1", "release", "([0-9]+.[0-9]+.[0-9]+).*")) by (kernel)) > 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host kernel version deviations (instance {{ "{{" }} $labels.instance }})"
+            description: "Different kernel versions are running\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostOomKillDetected
+          expr: increase(node_vmstat_oom_kill[5m]) > 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host OOM kill detected (instance {{ "{{" }} $labels.instance }})"
+            description: "OOM kill detected\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostNetworkReceiveErrors
+          expr: increase(node_network_receive_errs_total[5m]) > 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host Network Receive Errors (instance {{ "{{" }} $labels.instance }})"
+            description: "{{ "{{" }} $labels.instance }} interface {{ "{{" }} $labels.device }} has encountered receive errors in the last five minutes.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: HostNetworkTransmitErrors
+          expr: increase(node_network_transmit_errs_total[5m]) > 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Host Network Transmit Errors (instance {{ "{{" }} $labels.instance }})"
+            description: "{{ "{{" }} $labels.instance }} interface {{ "{{" }} $labels.device }} has encountered transmit errors in the last five minutes.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerKilled
+          expr: time() - container_last_seen > 60
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container killed (instance {{ "{{" }} $labels.instance }})"
+            description: "A container has disappeared\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerCpuUsage
+          expr: ((sum(irate(container_cpu_usage_seconds_total{image!="",container!="POD", namespace!="kube-system"}[30s])) by (namespace,container,pod) / sum(container_spec_cpu_quota{image!="",container!="POD", namespace!="kube-system"} / container_spec_cpu_period{image!="",container!="POD", namespace!="kube-system"}) by (namespace,container,pod) ) * 100)  > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container CPU usage (instance {{ "{{" }} $labels.instance }})"
+            description: "Container CPU usage is above 80%\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerMemoryUsage
+          expr: ((( sum(container_memory_usage_bytes{image!="",container!="POD", namespace!="kube-system"}) by (namespace,container,pod)  / sum(container_spec_memory_limit_bytes{image!="",container!="POD",namespace!="kube-system"}) by (namespace,container,pod) ) * 100 ) < +Inf ) > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container Memory usage (instance {{ "{{" }} $labels.instance }})"
+            description: "Container Memory usage is above 80%\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerVolumeUsage
+          expr: (1 - (sum(container_fs_inodes_free) BY (instance) / sum(container_fs_inodes_total) BY (instance)) * 100) > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container Volume usage (instance {{ "{{" }} $labels.instance }})"
+            description: "Container Volume usage is above 80%\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerVolumeIoUsage
+          expr: (sum(container_fs_io_current) BY (instance, name) * 100) > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container Volume IO usage (instance {{ "{{" }} $labels.instance }})"
+            description: "Container Volume IO usage is above 80%\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: ContainerHighThrottleRate
+          expr: rate(container_cpu_cfs_throttled_seconds_total[3m]) > 2
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Container high throttle rate (instance {{ "{{" }} $labels.instance }})"
+            description: "Container is being throttled\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: MysqlDown
+          expr: mysql_up == 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "MySQL down (instance {{ "{{" }} $labels.instance }})"
+            description: "MySQL instance is down on {{ "{{" }} $labels.instance }}\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: MysqlTooManyConnections
+          expr: avg by (instance) (max_over_time(mysql_global_status_threads_connected[5m])) / avg by (instance) (mysql_global_variables_max_connections) * 100 > 80
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "MySQL too many connections (instance {{ "{{" }} $labels.instance }})"
+            description: "More than 80% of MySQL connections are in use on {{ "{{" }} $labels.instance }}\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: MysqlHighThreadsRunning
+          expr: avg by (instance) (max_over_time(mysql_global_status_threads_running[5m])) / avg by (instance) (mysql_global_variables_max_connections) * 100 > 60
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "MySQL high threads running (instance {{ "{{" }} $labels.instance }})"
+            description: "More than 60% of MySQL connections are in running state on {{ "{{" }} $labels.instance }}\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: MysqlSlowQueries
+          expr: mysql_global_status_slow_queries > 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "MySQL slow queries (instance {{ "{{" }} $labels.instance }})"
+            description: "MySQL server is having some slow queries.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: MysqlRestarted
+          expr: mysql_global_status_uptime < 60
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "MySQL restarted (instance {{ "{{" }} $labels.instance }})"
+            description: "MySQL has just been restarted, less than one minute ago on {{ "{{" }} $labels.instance }}.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesNodeReady
+          expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes Node ready (instance {{ "{{" }} $labels.instance }})"
+            description: "Node {{ "{{" }} $labels.node }} has been unready for a long time\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesMemoryPressure
+          expr: kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes memory pressure (instance {{ "{{" }} $labels.instance }})"
+            description: "{{ "{{" }} $labels.node }} has MemoryPressure condition\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesDiskPressure
+          expr: kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes disk pressure (instance {{ "{{" }} $labels.instance }})"
+            description: "{{ "{{" }} $labels.node }} has DiskPressure condition\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesOutOfDisk
+          expr: kube_node_status_condition{condition="OutOfDisk",status="true"} == 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes out of disk (instance {{ "{{" }} $labels.instance }})"
+            description: "{{ "{{" }} $labels.node }} has OutOfDisk condition\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesJobFailed
+          expr: kube_job_status_failed > 0
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes Job failed (instance {{ "{{" }} $labels.instance }})"
+            description: "Job {{ "{{" }}$labels.namespace}}/{{ "{{" }}$labels.exported_job}} failed to complete\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesPersistentvolumeclaimPending
+          expr: kube_persistentvolumeclaim_status_phase{phase="Pending"} == 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes PersistentVolumeClaim pending (instance {{ "{{" }} $labels.instance }})"
+            description: "PersistentVolumeClaim {{ "{{" }} $labels.namespace }}/{{ "{{" }} $labels.persistentvolumeclaim }} is pending\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesStatefulsetDown
+          expr: (kube_statefulset_status_replicas_ready / kube_statefulset_status_replicas_current) != 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes StatefulSet down (instance {{ "{{" }} $labels.instance }})"
+            description: "A StatefulSet went down\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesHpaScalingAbility
+          expr: kube_hpa_status_condition{condition="false", status="AbleToScale"} == 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes HPA scaling ability (instance {{ "{{" }} $labels.instance }})"
+            description: "Pod is unable to scale\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesHpaMetricAvailability
+          expr: kube_hpa_status_condition{condition="false", status="ScalingActive"} == 1
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes HPA metric availability (instance {{ "{{" }} $labels.instance }})"
+            description: "HPA is not able to colelct metrics\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesHpaScaleCapability
+          expr: kube_hpa_status_desired_replicas >= kube_hpa_spec_max_replicas
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes HPA scale capability (instance {{ "{{" }} $labels.instance }})"
+            description: "The maximum number of desired Pods has been hit\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesPodNotHealthy
+          expr: min_over_time(sum by (namespace, pod) (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"})[1h:]) > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes Pod not healthy (instance {{ "{{" }} $labels.instance }})"
+            description: "Pod has been in a non-ready state for longer than an hour.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesPodCrashLooping
+          expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 5 > 5
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes pod crash looping (instance {{ "{{" }} $labels.instance }})"
+            description: "Pod {{ "{{" }} $labels.pod }} is crash looping\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesReplicassetMismatch
+          expr: kube_replicaset_spec_replicas != kube_replicaset_status_ready_replicas
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes ReplicasSet mismatch (instance {{ "{{" }} $labels.instance }})"
+            description: "Deployment Replicas mismatch\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesDeploymentReplicasMismatch
+          expr: kube_deployment_spec_replicas != kube_deployment_status_replicas_available
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes Deployment replicas mismatch (instance {{ "{{" }} $labels.instance }})"
+            description: "Deployment Replicas mismatch\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesStatefulsetReplicasMismatch
+          expr: kube_statefulset_status_replicas_ready != kube_statefulset_status_replicas
+          for: 5s
+          labels:
+            severity: warning
+            team: devops
+          annotations:
+            summary: "Kubernetes StatefulSet replicas mismatch (instance {{ "{{" }} $labels.instance }})"
+            description: "A StatefulSet has not matched the expected number of replicas for longer than 15 minutes.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesDeploymentGenerationMismatch
+          expr: kube_deployment_status_observed_generation != kube_deployment_metadata_generation
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes Deployment generation mismatch (instance {{ "{{" }} $labels.instance }})"
+            description: "A Deployment has failed but has not been rolled back.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesStatefulsetGenerationMismatch
+          expr: kube_statefulset_status_observed_generation != kube_statefulset_metadata_generation
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes StatefulSet generation mismatch (instance {{ "{{" }} $labels.instance }})"
+            description: "A StatefulSet has failed but has not been rolled back.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesStatefulsetUpdateNotRolledOut
+          expr: max without (revision) (kube_statefulset_status_current_revision unless kube_statefulset_status_update_revision) * (kube_statefulset_replicas != kube_statefulset_status_replicas_updated)
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes StatefulSet update not rolled out (instance {{ "{{" }} $labels.instance }})"
+            description: "StatefulSet update has not been rolled out.\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesDaemonsetRolloutStuck
+          expr: kube_daemonset_status_number_ready / kube_daemonset_status_desired_number_scheduled * 100 < 100 or kube_daemonset_status_desired_number_scheduled - kube_daemonset_status_current_number_scheduled > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes DaemonSet rollout stuck (instance {{ "{{" }} $labels.instance }})"
+            description: "Some Pods of DaemonSet are not scheduled or not ready\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesDaemonsetMisscheduled
+          expr: kube_daemonset_status_number_misscheduled > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes DaemonSet misscheduled (instance {{ "{{" }} $labels.instance }})"
+            description: "Some DaemonSet Pods are running where they are not supposed to run\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesApiServerErrors
+          expr: sum(rate(apiserver_request_count{job="apiserver",code=~"^(?:5..)$"}[2m])) / sum(rate(apiserver_request_count{job="apiserver"}[2m])) * 100 > 3
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes API server errors (instance {{ "{{" }} $labels.instance }})"
+            description: "Kubernetes API server is experiencing high error rate\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: KubernetesApiClientErrors
+          expr: (sum(rate(rest_client_requests_total{code=~"(4|5).."}[2m])) by (instance, job) / sum(rate(rest_client_requests_total[2m])) by (instance, job)) * 100 > 1
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "Kubernetes API client errors (instance {{ "{{" }} $labels.instance }})"
+            description: "Kubernetes API client is experiencing high error rate\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: CorednsPanicCount
+          expr: increase(coredns_panic_count_total[10m]) > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: "CoreDNS Panic Count (instance {{ "{{" }} $labels.instance }})"
+            description: "Number of CoreDNS panics encountered\n  VALUE = {{ "{{" }} $value }}\n  LABELS: {{ "{{" }} $labels }}"
+
+        - alert: Container restarted
+          expr: sum(increase(kube_pod_container_status_restarts_total{namespace!="kube-system",pod_template_hash=""}[1m])) by (pod,namespace,container) > 0
+          for: 5s
+          labels:
+            severity: critical
+            team: devops
+          annotations:
+            summary: Container named {{ "{{" }} $labels.container }} in {{ "{{" }} $labels.pod }} in {{ "{{" }} $labels.namespace }} was restarted
+            description: Container named {{ "{{" }} $labels.container }} in {{ "{{" }} $labels.pod }} in {{ "{{" }} $labels.namespace }} was restarted

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logstash
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+  labels:
+    app: logstash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logstash
+  template:
+    metadata:
+      labels:
+        app: logstash
+    spec:
+      containers:
+        - name: logstash
+          image: docker.elastic.co/logstash/logstash:6.8.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - --path.config=/usr/share/logstash/pipeline/logstash.conf
+
+          volumeMounts:
+            - name: config-volume
+              mountPath: /usr/share/logstash/pipeline
+
+          resources:
+            {{- toYaml .Values.logstash_resources | nindent 12 }}
+
+      volumes:
+      - name: config-volume
+        configMap:
+          name: logstash-config
+          items:
+            - key: logstash.conf
+              path: logstash.conf
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: logstash
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  selector:
+    app: logstash
+  ports:
+  - protocol: TCP
+    port: 5044
+    targetPort: 5044

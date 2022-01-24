@@ -1,0 +1,63 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: django-static-pv
+  labels:
+    app: employee
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Retain
+#  hostPath:
+#    path: "/mnt/django_static"
+  nfs:
+    server: 172.31.31.97
+    path: /mnt/LV130GB/amiramir/static
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: django-static-pvc
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: employee
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: django-static-pv
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: django-logs-pv
+  labels:
+    app: employee
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 1Gi
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: "/mnt/django_logs"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: django-logs-pvc
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: employee
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: django-logs-pv
+

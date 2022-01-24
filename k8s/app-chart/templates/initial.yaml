@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: initial
+spec:
+
+  containers:
+    - image:  {{ required "An image is required!" .Values.image.name }}:{{ .Values.image.tag | default "latest" }}
+      name: initial
+      imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+      env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              key: user-password
+              name: mariadb-pass
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              key: secret-key
+              name: secret-key
+        - name: DB_NAME
+          value: {{ .Values.global.database.name | quote }}
+        - name: DB_HOST
+          value: "mariadb"
+        - name: DB_PORT
+          value: "3306"
+        - name: DB_USER
+          value: {{ .Values.global.database.user | quote }}
+      command: ['/bin/bash', '-c', 'python manage.py loaddata initial_db.json; echo "from django.contrib.auth.models import User; User.objects.create_superuser("{{ required "Superuser name is required!" .Values.django.superuser.name }}", "admin@example.com", "{{ required "Password for superuser is required!" .Values.django.superuser.password }}")" | python manage.py shell; while [ ! -f /tmp/install-finished ]; do sleep 2; touch /tmp/install-finished; done;']
+
+  restartPolicy: Never
+

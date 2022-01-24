@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: employee
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: employee
+spec:
+  replicas: {{ .Values.replicaCount | default "2" }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: employee
+  template:
+    metadata:
+      labels:
+        app: employee
+    spec:
+      volumes:
+        - name: django-static
+          persistentVolumeClaim:
+            claimName: django-static-pvc
+        - name: django-logs
+          persistentVolumeClaim:
+            claimName: django-logs-pvc
+
+      containers:
+        - image: {{ required "An image is required!" .Values.image.name }}:{{ .Values.image.tag | default "latest" }}
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+          name: employee
+
+          env:
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: user-password
+                name: mariadb-pass
+          - name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: secret-key
+                name: secret-key
+          - name: DB_NAME
+            value: {{ .Values.global.database.name | quote }}
+          - name: DB_HOST
+            value: "mariadb"
+          - name: DB_PORT
+            value: "3306"
+          - name: DB_USER
+            value: {{ .Values.global.database.user | quote }}
+
+          volumeMounts:
+            - name: django-static
+              mountPath: /app/static
+            - name: django-logs
+              mountPath: /app/logs
+
+          startupProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+            successThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+      initContainers:
+      - name: migration
+        image: {{ required "An image is required!" .Values.image.name }}:{{ .Values.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+        env:
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: user-password
+                name: mariadb-pass
+          - name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: secret-key
+                name: secret-key
+          - name: DB_NAME
+            value: {{ .Values.global.database.name | quote }}
+          - name: DB_HOST
+            value: "mariadb"
+          - name: DB_PORT
+            value: "3306"
+          - name: DB_USER
+            value: {{ .Values.global.database.user | quote }}
+        command: ["/bin/bash", "-c", "python manage.py migrate --noinput"]
+        resources:
+          {{- toYaml .Values.init_resource | nindent 12 }}
+
+      - name: collect-static
+        image: {{ required "An image is required!" .Values.image.name }}:{{ .Values.image.tag | default "latest" }}
+        imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+        env:
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: user-password
+                name: mariadb-pass
+          - name: SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                key: secret-key
+                name: secret-key
+          - name: DB_NAME
+            value: {{ .Values.global.database.name | quote }}
+          - name: DB_HOST
+            value: "mariadb"
+          - name: DB_PORT
+            value: "3306"
+          - name: DB_USER
+            value: {{ .Values.global.database.user | quote }}
+        command: ["/bin/bash", "-c", "python manage.py collectstatic --noinput"]
+        volumeMounts:
+          - name: django-static
+            mountPath: /app/static
+        resources:
+          {{- toYaml .Values.init_resource | nindent 12 }}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: employee
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+spec:
+  selector:
+    app: employee
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8000
+      targetPort: 8000

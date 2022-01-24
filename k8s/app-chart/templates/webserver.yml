@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webserver
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: webserver
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: webserver
+  template:
+    metadata:
+      labels:
+        app: webserver
+    spec:
+      volumes:
+        - name: nginx-config
+          configMap:
+            name: nginx-config
+        - name: django-static
+          persistentVolumeClaim:
+            claimName: django-static-pvc
+
+      containers:
+        - image: nginx:1.19
+          name: webserver
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: default.conf
+            - name: django-static
+              mountPath: /app/static
+
+          startupProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 2
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+            successThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 2
+
+          resources:
+            {{- toYaml .Values.nginx_resource | nindent 12 }}
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: webserver
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+spec:
+  selector:
+    app: webserver
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 80

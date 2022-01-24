@@ -1,0 +1,32 @@
+[
+  {
+    "model": "restapp.employee",
+    "pk": 100,
+    "fields": {
+      "first_name": "Jazmin",
+      "last_name": "Hirst",
+      "department": "Marketing",
+      "employee_id": 100
+    }
+  },
+  {
+    "model": "restapp.employee",
+    "pk": 200,
+    "fields": {
+      "first_name": "Cari",
+      "last_name": "Mccartney",
+      "employee_id": 200,
+      "department": "Operations"
+    }
+  },
+  {
+    "model": "restapp.employee",
+    "pk": 300,
+    "fields": {
+      "first_name": "Diya",
+      "last_name": "Byrd",
+      "employee_id": 300,
+      "department": "Finance"
+    }
+  }
+]

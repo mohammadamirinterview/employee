@@ -1,0 +1,7 @@
+coreapi
+django
+django-environ
+djangorestframework
+mysqlclient
+gunicorn
+django-prometheus

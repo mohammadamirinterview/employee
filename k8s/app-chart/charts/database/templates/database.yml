@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mariadb
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: mariadb
+spec:
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mariadb
+      tier: mariadb
+  template:
+    metadata:
+      labels:
+        app: mariadb
+        tier: mariadb
+    spec:
+      containers:
+        - image: mariadb:10.3
+          imagePullPolicy: IfNotPresent
+          name: mariadb
+          env:
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: root-password
+                name: mariadb-pass
+          - name: MYSQL_DATABASE
+            value: {{ required "Database name is required!" .Values.global.database.name | quote }}
+          - name: MYSQL_USER
+            value: {{ required "Non-root database user is required!" .Values.global.database.user | quote }}
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                key: user-password
+                name: mariadb-pass
+
+          ports:
+          - containerPort: 3306
+            name: db
+
+          volumeMounts:
+          - name: db
+            mountPath: /var/lib/mysql
+          - name: query
+            mountPath: /docker-entrypoint-initdb.d/create.sql
+            subPath: create.sql
+
+          resources:
+            {{- toYaml .Values.database_resources | nindent 12 }}
+
+        - image: prom/mysqld-exporter
+          name: mariadb-exporter
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: DATA_SOURCE_NAME
+            valueFrom:
+              secretKeyRef:
+                key: exporter-data-source
+                name: mariadb-pass
+
+          resources:
+            {{- toYaml .Values.db_exporter_resources | nindent 12 }}
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+
+      volumes:
+      - name: db
+        persistentVolumeClaim:
+          claimName: mariadb-pv-claim
+      - name: query
+        configMap:
+          name: query

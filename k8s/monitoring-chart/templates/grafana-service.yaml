@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-nodeport
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  selector:
+    k8s-app: grafana
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      nodePort: {{ required "A port between 30000 to 32767 is required!" .Values.service.nodeport }}
+      port: 3000

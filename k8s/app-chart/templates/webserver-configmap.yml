@@ -1,0 +1,31 @@
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: nginx-config
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+data:
+  default.conf: |
+    upstream employee {
+        server employee:8000;
+    }
+
+    server {
+
+        listen 80;
+
+        location / {
+            proxy_pass http://employee;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_connect_timeout 90;
+            proxy_send_timeout 60;
+            proxy_read_timeout 60;
+        }
+
+        location /static/ {
+            sendfile off;
+            alias /app/static/;
+        }
+
+    }

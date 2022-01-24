@@ -1,0 +1,110 @@
+# NameSpace
+namespace: ""
+
+# AlertManager
+alertmanager:
+  image:
+    tag: ""
+  slack:
+    webhook: ""
+    channel: ""
+  receiver: ""
+
+alertmanager_resources:
+  limits:
+    cpu: ""
+    memory: ""
+  requests:
+    cpu: ""
+    memory: ""
+
+# Grafana
+grafana:
+  image:
+    tag: ""
+  password: ""
+
+grafana_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+service:
+  nodeport: ""
+
+# State Metric
+metrics:
+  image:
+    tag: ""
+
+metric_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+addon_resizer:
+  image:
+    tag: ""
+
+addon_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Node Exporter
+node_exporter:
+  image:
+    tag: ""
+
+node_exporter_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Prometheus
+prometheus:
+  configreload:
+    image:
+      tag: ""
+  image:
+    tag: ""
+
+prometheus_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+configreload_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+prometheus_init_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Django
+django:
+  namespace: ""

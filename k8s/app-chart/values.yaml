@@ -1,0 +1,62 @@
+# Main Containers
+replicaCount: ""
+
+image:
+  name: ""
+  tag: ""
+  pullPolicy: "IfNotPresent"
+
+resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# initContainers
+init_resource:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Nginx Container
+nginx_resource:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+# Services
+service:
+  nodeport: ""
+
+# Database
+global:
+  namespace: ""
+  database:
+    name: ""
+    user: ""
+
+# Configs
+django:
+  secret_key: ""
+  superuser:
+    name: ""
+    password: ""
+
+# Filebeat
+filebeat_resources:
+ limits:
+   cpu: ""
+   memory: ""
+ requests:
+   cpu: ""
+   memory: ""
+
+log_namespace: ""

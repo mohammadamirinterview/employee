@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: filebeat-config
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+  labels:
+    app: filebeat
+data:
+  filebeat.yml: |-
+    filebeat.inputs:
+    - type: log
+      enabled: true
+      paths:
+        - /app/logs/*
+
+    output.logstash:
+      hosts: ["logstash.{{ .Values.log_namespace }}:5044"]

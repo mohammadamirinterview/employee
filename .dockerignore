@@ -1,0 +1,6 @@
+deploy.yml
+static
+k8s
+Dockerfile
+myapi/.env
+myapi/.env.example

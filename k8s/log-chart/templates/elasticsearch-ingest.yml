@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: elasticsearch-ingest
+    env: prod
+  name: elasticsearch-ingest
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: elasticsearch-ingest
+  template:
+    metadata:
+      labels:
+        app: elasticsearch-ingest
+    spec:
+      containers:
+        - name: elasticsearch-ingest
+          image: docker.elastic.co/elasticsearch/elasticsearch:6.8.2
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: bootstrap.memory_lock
+            value: "false"
+          - name: cluster.name
+            value: elk
+          - name: discovery.zen.ping.unicast.hosts
+            value: elasticsearch-data,elasticsearch-master
+          - name: network.host
+            value: "0.0.0.0"
+          - name: node.data
+            value: "false"
+          - name: node.ingest
+            value: "true"
+          - name: node.master
+            value: "false"
+          - name: node.name
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+
+          ports:
+          - containerPort: 9300
+            name: transport
+            protocol: TCP
+
+          resources:
+            {{- toYaml .Values.elastic_ingest_resources | nindent 12 }}
+
+          volumeMounts:
+          - name: storage-client
+            mountPath: /usr/share/elasticsearch/data
+
+      initContainers:
+        - name: init-sysctl
+          image: busybox
+          command: ['sysctl', '-w', 'vm.max_map_count=262144']
+          securityContext:
+            privileged: true
+          resources:
+            {{- toYaml .Values.elastic_init_resources | nindent 12 }}
+
+        - name: fix-the-volume-permission
+          image: busybox
+          command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/elasticsearch/data']
+          securityContext:
+            privileged: true
+          volumeMounts:
+            - name: storage-client
+              mountPath: /usr/share/elasticsearch/data
+          resources:
+            {{- toYaml .Values.elastic_init_resources | nindent 12 }}
+
+        - name: increase-the-ulimit
+          image: busybox
+          command: ['sh', '-c', 'ulimit -n 65536']
+          securityContext:
+            privileged: true
+          resources:
+            {{- toYaml .Values.elastic_init_resources | nindent 12 }}
+
+      volumes:
+      - name: storage-client
+        persistentVolumeClaim:
+          claimName: elasticsearch-ingest-pvc
+
+      tolerations:
+      - key: node.kubernetes.io/not-ready
+        effect: NoExecute
+        tolerationSeconds: 0
+      - key: node.kubernetes.io/unreachable
+        effect: NoExecute
+        tolerationSeconds: 0
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+  name: elasticsearch-ingest
+  labels:
+    app: elasticsearch-ingest
+spec:
+  type: ClusterIP
+  selector:
+    app: elasticsearch-ingest
+  ports:
+  - name: http
+    port: 9200
+    protocol: TCP

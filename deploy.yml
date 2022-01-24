@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Run employee chart
+    shell: helm install employee k8s/app-chart --values k8s/app-chart/values.yaml --debug
+
+  - name: Run log chart
+    shell: helm install log k8s/log-chart --values k8s/log-chart/values.yaml --debug
+
+  - name: Run monitoring chart
+    shell: helm install monitoring k8s/monitoring-chart --values k8s/monitoring-chart/values.yaml --debug

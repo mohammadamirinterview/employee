@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alertmanager
+  namespace: {{ required "Namespace is required!" .Values.namespace }}
+data:
+  config.yml: |-
+    global:
+      resolve_timeout: 30s
+      slack_api_url: "{{ .Values.alertmanager.slack.webhook }}"
+
+    templates:
+    - '/etc/alertmanager-templates/*.tmpl'
+    route:
+      # When a new group of alerts is created by an incoming alert, wait at
+      # least 'group_wait' to send the initial notification.
+      # This way ensures that you get multiple alerts for the same group that start
+      # firing shortly after another are batched together on the first
+      # notification.
+      group_by: ['alertname', 'instance']
+      group_wait: 10s
+
+      # When the first notification was sent, wait 'group_interval' to send a batch
+      # of new alerts that started firing for that group.
+      group_interval: 60s
+
+      # If an alert has successfully been sent, wait 'repeat_interval' to
+      # resend them.
+      repeat_interval: 300s
+
+      # A default receiver
+      receiver: "devops"
+
+      # All the above attributes are inherited by all child routes and can
+      # overwritten on each.
+      routes:
+        - receiver: "{{ .Values.alertmanager.receiver }}"
+          group_wait: 10s
+          match_re:
+            severity: critical|warning
+            team: devops
+          continue: true
+
+    receivers:
+      - name: "{{ .Values.alertmanager.receiver }}"
+        slack_configs:
+          - api_url: "{{ .Values.alertmanager.slack.webhook }}"
+            send_resolved: true
+            channel: "{{ .Values.alertmanager.slack.channel }}"
+            color: '{{ "{{" }} if eq .Status "firing" }}danger{{ "{{" }} else }}good{{ "{{" }} end }}'
+            title: |-
+             [{{ "{{" }} .Status | toUpper }}{{ "{{" }} if eq .Status "firing" }}:{{ "{{" }} .Alerts.Firing | len }}{{ "{{" }} end }}] {{ "{{" }} .CommonLabels.alertname }} for {{ "{{" }} .CommonLabels.job }}
+             {{ "{{" }}- if gt (len .CommonLabels) (len .GroupLabels) -}}
+               {{ "{{" }}" "}}(
+               {{ "{{" }}- with .CommonLabels.Remove .GroupLabels.Names }}
+                 {{ "{{" }}- range $index, $label := .SortedPairs -}}
+                   {{ "{{" }} if $index }}, {{ "{{" }} end }}
+                   {{ "{{" }}- $label.Name }}="{{ "{{" }} $label.Value -}}"
+                 {{ "{{" }}- end }}
+               {{ "{{" }}- end -}}
+               )
+             {{ "{{" }}- end }}
+            text: >-
+             <!channel>  {{ "{{" }} range .Alerts -}}
+             *Alert:* {{ "{{" }} .Annotations.title }}{{ "{{" }} if .Labels.severity }} - `{{ "{{" }} .Labels.severity }}`{{ "{{" }} end }}
+
+             *Description:* {{ "{{" }} .Annotations.description }}
+
+             *Details:*
+               {{ "{{" }} range .Labels.SortedPairs }} • *{{ "{{" }} .Name }}:* `{{ "{{" }} .Value }}`
+               {{ "{{" }} end }}
+             {{ "{{" }} end }}

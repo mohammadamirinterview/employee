@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: webserver-nodeport
+  namespace: {{ required "Namespace is required!" .Values.global.namespace }}
+spec:
+  selector:
+    app: webserver
+  type: NodePort
+  ports:
+    - name: http
+      protocol: TCP
+      nodePort: {{ required "A port between 30000 to 32767 is required!" .Values.service.nodeport }}
+      port: 80
